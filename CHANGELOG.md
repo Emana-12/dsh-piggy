@@ -7,6 +7,10 @@ All notable changes to `dsh-pig`. Versions follow the plugin's own
 
 ## [Unreleased]
 
+## Codex 本地插件
+
+新增 Codex 本地插件 marketplace 与安装脚本，以及桌面版 IPC 桥。MCP 通过桌面主进程读写唯一存档，开放养成、工作事件和扩展操作；桌面端需要外壳 0.6.5。Codex CLI marketplace 重复安装及 MCP 工具发现已通过；Electron 真实窗口已启动。真实 Codex agent 工具调用和桌面窗口双向同步仍待联调验收，当前未发布。
+
 ## [0.36.0] — 2026-10-11 · 动森风菜园矿洞、无描边画风（外壳 0.6.4 不变）
 
 ### 小猪画风

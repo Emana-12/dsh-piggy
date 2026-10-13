@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url'
  * Load the game from `gameDir` and serve its routes.
  * @param {string} gameDir  a folder laid out like apps/desktop/game (see scripts/pack-game.mjs)
  * @param {string} statePath where this pig's save lives
- * @param {{ fetch?: typeof globalThis.fetch, onSnapshot?: (view: any) => void }} [options]
+ * @param {{ fetch?: typeof globalThis.fetch, onSnapshot?: (view: any) => void, onStateChanged?: () => void }} [options]
  */
 export async function startHost(gameDir, statePath, options = {}) {
   const load = name => import(pathToFileURL(join(gameDir, name)).href)
@@ -61,6 +61,7 @@ export async function startHost(gameDir, statePath, options = {}) {
             const view = JSON.parse(String(chunk))
             if (Array.isArray(view.pending) && view.pending.length > 0) options.onSnapshot(view)
           }
+          if (method === 'POST' && path === '/dsh-piggy/act') options.onStateChanged?.()
           resolve({ status, headers, body: chunk ?? '' })
         },
       }
@@ -68,5 +69,12 @@ export async function startHost(gameDir, statePath, options = {}) {
     })
   }
 
-  return { store, handle, dispose: () => store.dispose() }
+  async function handleAction(body) {
+    const response = await handle('POST', '/dsh-piggy/act', JSON.stringify(body))
+    const result = typeof response.body === 'string' ? JSON.parse(response.body) : response.body
+    if (response.status >= 500) throw new Error(result?.error ?? '桌面养成操作失败')
+    return result
+  }
+
+  return { store, handle, handleAction, dispose: () => store.dispose() }
 }

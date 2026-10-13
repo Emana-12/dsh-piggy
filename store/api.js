@@ -68,6 +68,7 @@ import {
   registerCustomSkin as coreRegisterCustomSkin,
   sayAfter as coreSayAfter,
 } from '../core.js'
+import { randomUUID } from 'node:crypto'
 
 /**
  * @typedef {object} StoreControl
@@ -117,6 +118,19 @@ export function createApi(control) {
         console.warn(`[dsh-piggy] feed failed: event="${event}" reason="${error instanceof Error ? error.message : String(error)}"`)
         return []
       }
+    },
+
+    /** 从 Codex 本机桥收到一个工作事件，并把去重 ID 留在同一份存档中。 */
+    recordCodexEvent(event, eventId, success = true) {
+      if (!['turn', 'tool', 'toolError'].includes(event) || typeof eventId !== 'string' || eventId.length > 256) return { ok: false, reason: 'invalid-event' }
+      if (event === 'tool' && success !== true && success !== false) return { ok: false, reason: 'invalid-event' }
+      return mutate(state => {
+        const oldIds = Array.isArray(state.codexEventIds) ? state.codexEventIds.filter(value => typeof value === 'string').slice(-4095) : []
+        if (oldIds.includes(eventId)) return { ok: true, duplicate: true }
+        coreFeed(state, event === 'tool' && success === false ? 'toolError' : event, now())
+        state.codexEventIds = [...oldIds, eventId].slice(-4096)
+        return { ok: true }
+      })
     },
 
     /** Fold wall-clock decay in (and resolve work/illness) then hand back state. */
@@ -240,7 +254,9 @@ export function createApi(control) {
       // A save that exists but is not hatched is a box — reset and adopt both
       // produce one. Refusing because `state !== null` left the box unopenable.
       if (state !== null && state.hatched === true) return false
-      setState(state === null ? hatchEgg(now()) : coreHatch(state, now()))
+      const next = state === null ? hatchEgg(now()) : coreHatch(state, now())
+      next.pigId = next.pigId ?? randomUUID()
+      setState(next)
       scheduleSave()
       return true
     },
@@ -271,7 +287,9 @@ export function createApi(control) {
 
     /** Start from a brand new box, living pig or not. */
     reset() {
-      setState(coreReset(now()))
+      const next = coreReset(now())
+      next.pigId = randomUUID()
+      setState(next)
       scheduleSave()
       return true
     },
@@ -284,7 +302,9 @@ export function createApi(control) {
       const state = getState()
       if (state === null) return false
       if (state.dead !== true) return false
-      setState(coreAdopt(state, now()))
+      const next = coreAdopt(state, now())
+      next.pigId = randomUUID()
+      setState(next)
       scheduleSave()
       return true
     },

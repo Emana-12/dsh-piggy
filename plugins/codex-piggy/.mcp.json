@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "dsh-piggy": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "server.js"
+      ],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

@@ -2,6 +2,8 @@
 
 <h1 align="center">dsh-piggy</h1>
 
+> **本 Fork 的适配说明**：本项目在原版 dsh-piggy 的养成和桌面宠物基础上，新增了 Codex 联动适配。桌面版提供本机桥接协议，让 Codex 插件与桌面小猪共用同一份存档和 `pigId`；`plugins/codex-piggy/` 提供 Codex 的 MCP 工具、养成技能和工作事件 Hook；`adapters/generic/` 与 `docs/AI-CLI-接入指南.md` 提供交给其它 CLI 的 AI 自动生成适配器所需的模板和协议说明。桌面窗口和交互面板在 Windows 上使用更高的置顶层级，并在显示、恢复、聚焦和显示器变化后重新保持在最上层。原版养成规则、扩展机制和文件组织保持兼容。
+
 <p align="center">一只住在 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 里，也能独立住在桌面上的猪。</p>
 
 它会长大、上学、打工、旅行、钓鱼、生病，也会跟你搭话。界面采用动森风格的 App 主菜单，全部玩法都能用鼠标完成。番茄钟、钓鱼这类玩法是扩展：可以单独关掉、删除，也能从本仓库在线下载新扩展（盲盒、扭蛋、菜园、矿洞），下载不了时还能从文件导入。
@@ -63,9 +65,19 @@ macOS 包暂未签名，第一次打开请在访达中右键应用并选择“�
 
 「设置 → 更新」会分别显示游戏版本和桌面外壳版本（有新正式版时设置图标上有红点）。游戏包可在 App 内更新；桌面外壳从 v0.2.0 起，Windows 安装版和 Linux AppImage 可在 App 内下载并重启安装。Windows 便携版、未签名 macOS 版需到发布页手动替换；旧版外壳需先手动升级一次。详见[更新说明](docs/guides/updates.md)。
 
-当前桌面外壳是 **v0.6.4**：猪和面板是两个窗口（面板单独一个窗口贴在猪旁边，开面板、拖动时猪不再跳）；0.6.4 加了代理设置（跟随系统 / 直连 / 自定义 HTTP、SOCKS5），面板开着时猪说的话也不再被面板挡住。游戏 v0.33.0 起需要 0.6.x 的外壳——旧外壳会继续用自带的游戏包，并在「设置 → 更新」里提示先更新桌面程序（Windows 安装版和 Linux AppImage 可在 App 内更新，其余到发布页下载）。窗口摆放、可点区域、桌面样式等仍在游戏包里，这类修复在「更新」里点一下就到。
+当前公开发行版桌面外壳是 **v0.6.4**：猪和面板是两个窗口（面板单独一个窗口贴在猪旁边，开面板、拖动时猪不再跳）；0.6.4 加了代理设置（跟随系统 / 直连 / 自定义 HTTP、SOCKS5），面板开着时猪说的话也不再被面板挡住。游戏 v0.33.0 起需要 0.6.x 的外壳——旧外壳会继续用自带的游戏包，并在「设置 → 更新」里提示先更新桌面程序（Windows 安装版和 Linux AppImage 可在 App 内更新，其余到发布页下载）。窗口摆放、可点区域、桌面样式等仍在游戏包里，这类修复在「更新」里点一下就到。
+
+### Codex 桌面宠物联动
+
+ Codex 插件可和桌面版共用一份猪存档。安装 Node.js 20+、Git 与 Codex CLI 后，运行 [`scripts/install-codex-plugin.ps1`](scripts/install-codex-plugin.ps1)；再按[插件说明](plugins/codex-piggy/README.md)启动桌面版并配对。插件提供状态查询、养成操作、扩展查询和工作事件记录；桌面桥只传递事件类别、结果和标识，不读取提示词、源码、命令正文或工具参数。
+
+从本 Fork 根目录安装时，插件 marketplace 会使用仓库内的 `plugins/codex-piggy/`，桌面桥代码位于 `apps/desktop/`。插件和桌面版需要来自同一份源码，以确保桥接协议和 `pigId` 绑定一致。
 
 在线扩展从本仓库的 [`extensions/registry.json`](extensions/registry.json) 读，文件挂在本仓库的 GitHub Release（`ext-<名字>-<版本>`），下载后逐个核对校验值；只会安装我们自己发布的扩展。格式和写法见[扩展删除与在线下载](docs/design/extension-download.md)。
+
+### 交给其它 CLI 的 AI 自动接入
+
+本仓库提供通用接入说明 [`docs/AI-CLI-接入指南.md`](docs/AI-CLI-接入指南.md) 和适配器模板 [`adapters/generic/`](adapters/generic/)。把完整源码包交给目标 CLI 的 AI，并要求它按指南识别该 CLI 的 Hook、MCP 和插件目录后自动生成适配器。Windows 可用 `scripts/package-ai-adapter.ps1` 重新生成包含桌面端、桥接协议、模板和说明的交付压缩包。
 
 商店和背包中的「装扮」入口暂时隐藏，已有装扮和穿戴记录会保留；后续会重新设计展示方式。
 

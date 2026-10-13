@@ -9,6 +9,7 @@
  * @module dsh-piggy/store
  */
 import { dirname } from 'node:path'
+import { randomUUID } from 'node:crypto'
 
 import { settleAchievements } from './core.js'
 import { createApi } from './store/api.js'
@@ -88,6 +89,10 @@ export function createStore(filePath = defaultStatePath(), options = {}) {
   const opened = readStateFile(filePath, now(), journal)
   state = opened.state
   dirty = opened.needsSave
+  if (state !== null && (typeof state.pigId !== 'string' || !/^[0-9a-f-]{36}$/i.test(state.pigId))) {
+    state.pigId = randomUUID()
+    scheduleSave()
+  }
   report('info', 'save', '存档打开', { path: filePath, version: state?.version ?? null, hatched: state !== null, needsSave: dirty })
 
   return createApi({

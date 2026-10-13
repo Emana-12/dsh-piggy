@@ -53,3 +53,34 @@ test('a line consumed by the settings window is broadcast before the store queue
     assert.equal(broadcasts.length, 1)
   } finally { host?.dispose(); rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('any desktop client action triggers the state-change broadcast callback', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'piggy-state-changed-'))
+  let changed = 0
+  let host
+  try {
+    host = await startHost(ROOT, join(dir, 'state.json'), { onStateChanged: () => { changed += 1 } })
+    await host.handle('POST', '/dsh-piggy/act', JSON.stringify({ action: 'hatch' }))
+    assert.equal(changed, 1)
+    await host.handle('POST', '/dsh-piggy/act', JSON.stringify({ action: 'pet', part: 'head' }))
+    assert.equal(changed, 2)
+    await host.handle('POST', '/dsh-piggy/act', JSON.stringify({ action: 'not-an-action' }))
+    assert.equal(changed, 3, 'the panel refreshes even when an action is refused')
+  } finally { host?.dispose(); rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('a Codex-side store mutation becomes visible to the desktop status route', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'piggy-shared-state-'))
+  let host
+  try {
+    host = await startHost(ROOT, join(dir, 'state.json'))
+    const before = JSON.parse((await host.handle('GET', '/dsh-piggy/state')).body)
+    const action = await host.handleAction({ action: 'hatch' })
+    const after = JSON.parse((await host.handle('GET', '/dsh-piggy/state')).body)
+    assert.equal(action.hatched, true)
+    assert.equal(after.hatched, true)
+    assert.equal(typeof host.store.state.pigId, 'string')
+    assert.equal(after.pig.name, host.store.state.name)
+    assert.equal(before.hatched, false)
+  } finally { host?.dispose(); rmSync(dir, { recursive: true, force: true }) }
+})

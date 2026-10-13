@@ -22,6 +22,7 @@ import { BrowserWindow, Menu, Tray, app, dialog, ipcMain, nativeImage, net, prot
 import updaterPackage from 'electron-updater'
 
 import { startHost } from './lib/host.js'
+import { startCodexBridge } from './lib/codex-bridge.js'
 import { MIN_WINDOW, WINDOW_PADDING, clampBounds, contentBoundsForPig, dragPigBounds, moveAcrossDisplays, resizedPigScreenPoint } from './lib/window-geometry.js'
 import { createProxy } from './lib/proxy.js'
 import { RELEASES_PAGE, createVersions } from './lib/versions.js'
@@ -47,6 +48,11 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const FRAME_CAP = Number(process.env.PIGGY_FPS) || 0
 /** 非拖动时，窗口位置/大小差这么多以内就不改（见 applyBounds）。 */
 const BOUNDS_TOLERANCE = 2
+/**
+ * 桌宠和交互面板都要压在普通应用上面。Windows 的 screen-saver 层级比 floating
+ * 更可靠，尤其是在窗口重新显示、切换焦点或其它应用进入全屏后。
+ */
+const TOPMOST_LEVEL = process.platform === 'win32' ? 'screen-saver' : 'floating'
 
 /** 页面还没报内容框之前的兜底尺寸：折叠的猪 + 留白。 */
 const FALLBACK_CONTENT = { width: 132, height: 152 }
@@ -121,6 +127,7 @@ function serveFile(root, rel) {
 }
 
 let host = null
+let codexBridge = null
 /** @type {ReturnType<typeof createVersions> | null} */
 let versions = null
 /** @type {ReturnType<typeof createShellUpdates> | null} */
@@ -142,6 +149,24 @@ let petAsked = null
 let panelWin = null
 /** 正在退出/重启：关掉窗口前先置位，之后到达的页面消息一律不处理。 */
 let quitting = false
+
+/** 给窗口重新断言置顶状态；窗口事件和显示器变化后都可能需要调用。 */
+function keepWindowOnTop(target) {
+  if (target === null || target.isDestroyed()) return
+  target.setAlwaysOnTop(true, TOPMOST_LEVEL)
+}
+
+/** 两扇窗口共享同一置顶策略，避免只抬高猪窗口而漏掉交互面板。 */
+function keepPiggyWindowsOnTop() {
+  keepWindowOnTop(win)
+  keepWindowOnTop(panelWin)
+}
+
+function watchWindowTopmost(target) {
+  for (const event of ['show', 'restore', 'focus']) {
+    target.on(event, () => keepWindowOnTop(target))
+  }
+}
 /**
  * 消息是不是这扇窗口的页面发来的。窗口销毁后再读 win.webContents 会抛
  * 「Object has been destroyed」—— Windows 上在更新页切换版本时，旧页面的消息还在路上，
@@ -328,7 +353,8 @@ function createWindow() {
     // 被降频就会表现为「猪慢半拍 / 挪完窗口猪还在旧位置」。桌宠没有省电的必要，关掉。
     webPreferences: { preload: join(HERE, 'preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
   })
-  win.setAlwaysOnTop(true, 'floating')
+  keepWindowOnTop(win)
+  watchWindowTopmost(win)
   // 30fps：猪的动画够看，整窗合成的次数砍一半（D1 第 3 条）。
   if (FRAME_CAP > 0) win.webContents.setFrameRate(FRAME_CAP)
   // Until the page reports where the pig is, the window takes no clicks at all.
@@ -341,7 +367,7 @@ function createWindow() {
   win.loadURL('piggy://app/index.html')
   // 启动摆放最多管 3 秒：之后一律按猪当前位置算，免得哪次没对上就一直往回拽。
   win.once('ready-to-show', () => { setTimeout(() => { savedPigScreen = null }, 3000) })
-  win.once('ready-to-show', () => { log('ready-to-show'); win.showInactive(); log('shown', JSON.stringify(win.getBounds()), win.isVisible()) })
+  win.once('ready-to-show', () => { log('ready-to-show'); keepWindowOnTop(win); win.showInactive(); log('shown', JSON.stringify(win.getBounds()), win.isVisible()) })
   win.webContents.on('did-finish-load', () => log('page loaded'))
   // 面板开着时焦点离开猪窗口、也没进面板：当作点到别处（见 panelFocusLeft）
   win.on('blur', () => panelFocusLeft())
@@ -691,6 +717,7 @@ function sendPanel(message) {
  */
 function raisePetAbovePanel() {
   if (win === null || win.isDestroyed() || !win.isVisible()) return
+  keepWindowOnTop(win)
   win.moveTop()
 }
 
@@ -706,7 +733,8 @@ function ensurePanelWindow() {
     webPreferences: { preload: join(HERE, 'preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false,
       additionalArguments: ['--piggy-role=panel'] },
   })
-  panelWin.setAlwaysOnTop(true, 'floating')
+  keepWindowOnTop(panelWin)
+  watchWindowTopmost(panelWin)
   if (FRAME_CAP > 0) panelWin.webContents.setFrameRate(FRAME_CAP)
   panelWin.loadURL('piggy://app/index.html')
   panelWin.webContents.on('did-finish-load', () => {
@@ -739,6 +767,7 @@ function panelFocusLeft() {
 /** 把面板窗口放到该在的地方；第一次有尺寸时才显示（免得先闪一个空窗口）。 */
 function placePanel() {
   if (!panelOpen || panelWin === null || panelWin.isDestroyed()) return
+  keepWindowOnTop(panelWin)
   const next = panelBounds()
   if (next === null) return
   if (panelAsked === null || panelAsked.x !== next.x || panelAsked.y !== next.y
@@ -749,6 +778,7 @@ function placePanel() {
   if (panelSize !== null && !panelWin.isVisible()) {
     // 不抢焦点：GNOME 会把「抢焦点」变成一条「dsh-piggy is ready」的通知，每开一次面板弹一次
     //（2026-10-07 虚拟机录像里看到）。点进面板时它自然会拿到焦点。
+    keepWindowOnTop(panelWin)
     panelWin.showInactive()
     log('panel shown', JSON.stringify({ bounds: next, anchor: panelAnchor?.vertical }))
   }
@@ -1016,13 +1046,49 @@ app.whenReady().then(async () => {
   // Gitee 的 Windows 安装包不带游戏：第一次先下载（first-run.js）。
   let firstRun = null
   if (versions.needsGame()) {
-    firstRun = await downloadFirstGame({ versions, pinPath: gamePinPath(app, HERE), here: HERE, releasesPage: RELEASES_PAGE, log })
-    if (firstRun === null) { app.quit(); return }
+    if (!app.isPackaged) {
+      const bundledGame = join(HERE, 'game')
+      if (!existsSync(join(bundledGame, 'package.json'))) { throw new Error('桌面开发版缺少 game/；请先运行 npm run pack-game') }
+      versions = createVersions({ userData: app.getPath('userData'), bundledDir: bundledGame, shellVersion: app.getVersion(),
+        statePath: statePath(), releasesUrl: process.env.PIGGY_RELEASES_URL || undefined,
+        fetch: /** @type {any} */ (net.fetch.bind(net)),
+      })
+    } else {
+      firstRun = await downloadFirstGame({ versions, pinPath: gamePinPath(app, HERE), here: HERE, releasesPage: RELEASES_PAGE, log })
+      if (firstRun === null) { app.quit(); return }
+    }
   }
   const gameDir = versions.activeDir()
-  host = await startHost(gameDir, statePath(), { fetch: net.fetch.bind(net), onSnapshot: view => toPages('piggy:state-changed', view) })
+  host = await startHost(gameDir, statePath(), { fetch: net.fetch.bind(net), onSnapshot: view => toPages('piggy:state-changed', view), onStateChanged: () => toPages('piggy:state-changed') })
   hostJournal = /** @type {any} */ (host)?.store?.journal ?? null
   hostJournal?.record?.('info', 'shell', `桌面外壳 ${app.getVersion()} · 游戏包 ${gameDir}`)
+  codexBridge = startCodexBridge({
+    getStatus: async () => {
+      const response = await host.handle('GET', '/dsh-piggy/state')
+      const snapshot = typeof response.body === 'string' ? JSON.parse(response.body) : response.body
+      return { ...snapshot, pigId: host?.store?.state?.pigId ?? null }
+    },
+    getStore: () => host?.store,
+    getExtensions: async () => {
+      const response = await host.handle('GET', '/dsh-piggy/extensions/online')
+      return typeof response.body === 'string' ? JSON.parse(response.body) : response.body
+    },
+    handleAction: async body => {
+      const result = await host.handleAction(body)
+      return { ...result, pigId: host?.store?.state?.pigId ?? null }
+    },
+    onStateChange: () => {
+      announceStateChanged()
+    },
+    onRequest: method => hostJournal?.record?.('info', 'codex-bridge', '本机桥请求', { method }),
+  })
+  try {
+    await codexBridge.ready
+  } catch (error) {
+    log('codex-bridge', 'start failed', error instanceof Error ? error.message : String(error))
+    codexBridge.close()
+    codexBridge = null
+  }
   registerProtocol(gameDir)
   createWindow()
   firstRun?.destroy()
@@ -1035,6 +1101,7 @@ app.whenReady().then(async () => {
   // 页面手里的 workAreas 就会一直用旧的那份（分辨率变了但窗口刚好没动 → 用的是旧工作区）。
   const reclamp = (why, detail) => {
     if (win === null || win.isDestroyed()) return
+    keepPiggyWindowsOnTop()
     const bounds = win.getBounds()
     applyBounds(clampBounds(bounds, workAreaFor(bounds)), 'display')
     pushGeometry()
@@ -1097,5 +1164,5 @@ async function captureForCheck(dir) {
 process.on('uncaughtException', error => { log('uncaught', error?.stack ?? String(error)) })
 
 app.on('second-instance', () => win?.showInactive())
-app.on('before-quit', () => { quitting = true; stopDrag(); if (hitTimer !== null) clearInterval(hitTimer); try { host?.dispose() } catch { /* best effort */ } })
+app.on('before-quit', () => { quitting = true; stopDrag(); if (hitTimer !== null) clearInterval(hitTimer); try { codexBridge?.close() } catch { /* best effort */ } try { host?.dispose() } catch { /* best effort */ } })
 app.on('window-all-closed', () => app.quit())

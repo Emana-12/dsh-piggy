@@ -1,0 +1,30 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "description": "在 Codex 中照顾与桌面版共享存档的小猪。",
+  "name": "dsh-piggy",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "version": "0.1.0",
+  "mcpServers": "./.mcp.json",
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "interface": {
+        "shortDescription": "在 Codex 中照顾与桌面版共享存档的小猪。",
+        "developerName": "dsh-piggy",
+        "defaultPrompt": [
+          "看看小猪状态",
+          "在 Codex 里照顾桌面小猪"
+        ],
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "displayName": "dsh-piggy",
+        "longDescription": "在 Codex 对话里照顾、学习和安排桌面小猪的生活，与桌面宠物共享同一份存档。",
+        "category": "Lifestyle"
+      }
+    }
+  }
+}

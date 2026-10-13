@@ -1,0 +1,32 @@
+{
+  "description": "把 Codex 工作事件映射到绑定的桌面小猪；只传事件类别与成功状态。",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/work-event.js\"",
+            "async": true,
+            "timeout": 2,
+            "statusMessage": "记录小猪的工作成长"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/work-event.js\"",
+            "async": true,
+            "timeout": 2,
+            "statusMessage": "记录小猪的工作成长"
+          }
+        ]
+      }
+    ]
+  }
+}
