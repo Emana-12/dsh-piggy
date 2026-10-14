@@ -29,6 +29,7 @@ import { RELEASES_PAGE, createVersions } from './lib/versions.js'
 import { createShellUpdates, shellUpdateMode } from './lib/shell-update.js'
 import { dragHeartbeatExpired } from './lib/drag-watchdog.js'
 import { PANEL_FALLBACK, panelAnchorFor, panelBoundsFor, pigScreenBox } from './lib/panel-geometry.js'
+import { panelToggleAction } from './lib/panel-toggle.js'
 import { pointerHitsShape } from './lib/pointer-hit.js'
 import { downloadFirstGame, gamePinPath } from './first-run.js'
 
@@ -794,6 +795,7 @@ function placePanel() {
     keepWindowOnTop(panelWin)
     panelWin.showInactive()
     log('panel shown', JSON.stringify({ bounds: next, anchor: panelAnchor?.vertical }))
+    if (win !== null && !win.isDestroyed()) win.webContents.send('piggy:panel', { type: 'open' })
   }
 }
 
@@ -841,8 +843,15 @@ function reanchorPanel() {
 /** 猪页面：右键开/关面板（带上猪在窗口里的框）。 */
 ipcMain.on('piggy:panel:toggle', (event, request) => {
   if (!fromPet(event)) return
-  if (request?.open === true) openPanel(request.pig)
-  else closePanel('pet')
+  const action = panelToggleAction({ requestedOpen: request?.open === true, isOpen: panelOpen,
+    isVisible: panelWin !== null && !panelWin.isDestroyed() && panelWin.isVisible() })
+  if (action === 'open') openPanel(request.pig)
+  else if (action === 'close') closePanel('pet')
+  else {
+    // 首次加载期间复按只保持打开意图；回传状态，免得猪页面误以为已经关闭。
+    win.webContents.send('piggy:panel', { type: 'open' })
+    log('panel loading click kept')
+  }
 })
 /** 面板页面：内容量好了多大。 */
 ipcMain.on('piggy:panel:size', (event, size) => {
@@ -1106,6 +1115,9 @@ app.whenReady().then(async () => {
   }
   registerProtocol(gameDir)
   createWindow()
+  // 隐藏预加载，不调用 show/focus；首次右键不再等待创建窗口和加载客户端。
+  ensurePanelWindow()
+  log('panel preloaded', JSON.stringify({ visible: panelWin.isVisible(), focused: panelWin.isFocused() }))
   firstRun?.destroy()
   createTray(gameDir)
   // 用户机器上到底是什么显示器、什么缩放：以前日志里没有，Windows 的问题只能靠猜。

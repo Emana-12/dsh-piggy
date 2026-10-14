@@ -1,11 +1,10 @@
 // @ts-check
 /**
- * 设置：都是这台设备上的显示偏好，不进存档。
+ * 设置：显示偏好留在本机，免打扰与离线喂食跟随存档。
  * 每项一行：标题 + 一句说明 + 对应控件。大小用连续比例，代理用下拉选择。以前每个选项单独占一行、
  * 各带一个「使用」按钮，小猪大小一项就四行，用户反馈「菜单设计不合理」（2026-10-04）。
  */
 import { button, el } from '../dom.js'
-import { artStyle, setArtStyle } from '../art-style.js'
 import { autoCollapseEnabled, setAutoCollapse } from '../auto-collapse.js'
 import { desktopShell } from '../desktop-shell.js'
 import { emojiStyle, hasBundledEmoji, setEmojiStyle, applyEmojiStyle } from '../emoji-style.js'
@@ -92,12 +91,6 @@ export function renderSettingsTab(ui) {
   percent.addEventListener('keydown', event => { if (event.key === 'Enter') { applySize(Number(percent.value)); percent.blur() } })
   size.box.appendChild(sizeRow)
 
-  const art = section(ui, '小猪画风', '普通猪、皮肤、动作和睡姿一起切换；导入皮肤保持原图')
-  segmented(art, 'data-art-style', [
-    { key: 'no-outline', label: '无描边' },
-    { key: 'outlined', label: '黑色描边' },
-  ], artStyle(), function (key) { setArtStyle(key) })
-
   // 网页版和桌面版都自带了这套 emoji，所以两边都能选（旧外壳没有这个字体，就不显示）。
   if (hasBundledEmoji()) {
     const emoji = section(ui, 'Emoji 样式', '内置是随游戏附带的一整套 Noto 彩色 emoji，各系统看起来一样')
@@ -120,6 +113,15 @@ export function renderSettingsTab(ui) {
   quietToggle.appendChild(el('span', 'dp-switch-knob'))
   quietToggle.appendChild(el('span', 'dp-switch-text', quietOn ? '开' : '关'))
   quiet.head.appendChild(quietToggle)
+
+  const feeding = section(ui, '离开时自动吃背包里的东西', '')
+  const feedingOn = ui.view.dialogue.isOfflineFeedEnabled !== false
+  const feedingToggle = button('dp-switch', { 'data-offline-feed': String(feedingOn), 'aria-pressed': String(feedingOn) }, function () {
+    ui.send('offlineFeed', { on: !feedingOn })
+  })
+  feedingToggle.appendChild(el('span', 'dp-switch-knob'))
+  feedingToggle.appendChild(el('span', 'dp-switch-text', feedingOn ? '开' : '关'))
+  feeding.head.appendChild(feedingToggle)
 
   const close = section(ui, '点击别处时收起面板', '网页版点面板外、桌面版切到其他窗口时收起')
   const on = autoCollapseEnabled()
