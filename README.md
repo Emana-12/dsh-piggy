@@ -2,7 +2,7 @@
 
 <h1 align="center">dsh-piggy</h1>
 
-> **本 Fork 的适配说明**：本项目在原版 dsh-piggy 的养成和桌面宠物基础上，新增了 Codex 联动适配。桌面版提供本机桥接协议，让 Codex 插件与桌面小猪共用同一份存档和 `pigId`；`plugins/codex-piggy/` 提供 Codex 的 MCP 工具、养成技能和工作事件 Hook；`adapters/generic/` 与 `docs/AI-CLI-接入指南.md` 提供交给其它 CLI 的 AI 自动生成适配器所需的模板和协议说明。桌面窗口和交互面板在 Windows 上使用更高的置顶层级，并在显示、恢复、聚焦和显示器变化后重新保持在最上层。原版养成规则、扩展机制和文件组织保持兼容。
+> **本 Fork 的适配说明**：本项目在原版 dsh-piggy 的养成和桌面宠物基础上，新增了 Agent 联动适配。桌面版提供本机桥接协议，让各类支持 Hook 的 Agent 与桌面小猪共用同一份存档和 `pigId`；`plugins/codex-piggy/` 提供 Codex 的 MCP 工具与参考 Hook；`adapters/generic/` 与 `docs/AI-CLI-接入指南.md` 提供统一生命周期事件协议和交给其它 Agent AI 自动生成适配器所需的模板。桌面窗口和交互面板在 Windows 上使用更高的置顶层级，并在显示、恢复、聚焦和显示器变化后重新保持在最上层。原版养成规则、扩展机制和文件组织保持兼容。
 
 <p align="center">一只住在 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 里，也能独立住在桌面上的猪。</p>
 
@@ -69,7 +69,7 @@ macOS 包暂未签名，第一次打开请在访达中右键应用并选择“�
 
 ### Codex 桌面宠物联动
 
- Codex 插件可和桌面版共用一份猪存档。安装 Node.js 20+、Git 与 Codex CLI 后，运行 [`scripts/install-codex-plugin.ps1`](scripts/install-codex-plugin.ps1)；再按[插件说明](plugins/codex-piggy/README.md)启动桌面版并配对。插件提供状态查询、养成操作、扩展查询和工作事件记录；桌面桥只传递事件类别、结果和标识，不读取提示词、源码、命令正文或工具参数。
+ Codex 插件可和桌面版共用一份猪存档。安装 Node.js 20+、Git 与 Codex CLI 后，运行 [`scripts/install-codex-plugin.ps1`](scripts/install-codex-plugin.ps1)；再按[插件说明](plugins/codex-piggy/README.md)启动桌面版并配对。插件提供状态查询、养成操作、扩展查询和 Agent 工作状态提醒；桌面桥只传递统一事件类别、结果和标识，不读取提示词、源码、命令正文或工具参数。其它支持本地 Hook 的 Agent 可按 [`docs/AI-CLI-接入指南.md`](docs/AI-CLI-接入指南.md) 生成适配器，使用相同协议和 `DSH_PIGGY_HOME`。
 
 从本 Fork 根目录安装时，插件 marketplace 会使用仓库内的 `plugins/codex-piggy/`，桌面桥代码位于 `apps/desktop/`。插件和桌面版需要来自同一份源码，以确保桥接协议和 `pigId` 绑定一致。
 
@@ -77,7 +77,7 @@ macOS 包暂未签名，第一次打开请在访达中右键应用并选择“�
 
 ### 交给其它 CLI 的 AI 自动接入
 
-本仓库提供通用接入说明 [`docs/AI-CLI-接入指南.md`](docs/AI-CLI-接入指南.md) 和适配器模板 [`adapters/generic/`](adapters/generic/)。把完整源码包交给目标 CLI 的 AI，并要求它按指南识别该 CLI 的 Hook、MCP 和插件目录后自动生成适配器。Windows 可用 `scripts/package-ai-adapter.ps1` 重新生成包含桌面端、桥接协议、模板和说明的交付压缩包。
+本仓库提供通用接入说明 [`docs/AI-CLI-接入指南.md`](docs/AI-CLI-接入指南.md) 和适配器模板 [`adapters/generic/`](adapters/generic/)。把完整源码包交给目标 Agent 的 AI，并要求它按指南识别该 Agent 的 Hook、MCP 和插件目录后自动生成适配器。Windows 可用 `scripts/package-ai-adapter.ps1` 重新生成包含桌面端、桥接协议、模板和说明的交付压缩包。
 
 商店和背包中的「装扮」入口暂时隐藏，已有装扮和穿戴记录会保留；后续会重新设计展示方式。
 

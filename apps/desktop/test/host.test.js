@@ -84,3 +84,18 @@ test('a Codex-side store mutation becomes visible to the desktop status route', 
     assert.equal(before.hatched, false)
   } finally { host?.dispose(); rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('an Agent event snapshot carries the pig line to both desktop windows', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'piggy-agent-snapshot-'))
+  let host
+  try {
+    host = await startHost(ROOT, join(dir, 'state.json'))
+    await host.handle('POST', '/dsh-piggy/act', JSON.stringify({ action: 'hatch' }))
+    const recorded = host.store.recordAgentEvent('start', 'agent-snapshot-test')
+    assert.equal(recorded.ok, true)
+    const broadcast = host.getSnapshot()
+    assert.equal(broadcast.pending.filter(event => event.kind === 'line').length, 1)
+    // 两个窗口都收到同一份 broadcast 后，第二次读取不应再有竞争消费。
+    assert.deepEqual(host.getSnapshot().pending, [])
+  } finally { host?.dispose(); rmSync(dir, { recursive: true, force: true }) }
+})

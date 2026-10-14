@@ -1,11 +1,11 @@
-// 通用 CLI 适配器模板：目标 AI 必须按目标 CLI 的运行时和凭据目录改造。
+// 通用 Agent 适配器模板：目标 AI 必须按目标 Agent 的运行时和凭据目录改造。
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createConnection } from 'node:net'
 
-export function readPairing(home = process.env.CODEX_HOME || join(homedir(), '.codex')) {
+export function readPairing(home = process.env.DSH_PIGGY_HOME || process.env.CODEX_HOME || join(homedir(), '.codex')) {
   const file = join(home, 'dsh-piggy-pairing.json')
   const pairing = JSON.parse(readFileSync(file, 'utf8'))
   if (typeof pairing.endpoint !== 'string' || typeof pairing.pairingToken !== 'string') throw new Error('配对文件格式无效')

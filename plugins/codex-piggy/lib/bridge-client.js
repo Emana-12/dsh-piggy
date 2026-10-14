@@ -8,6 +8,8 @@ import { createConnection } from 'node:net'
 
 const BRIDGE_VERSION = 1
 function codexHome() {
+  const sharedHome = process.env.DSH_PIGGY_HOME
+  if (typeof sharedHome === 'string' && sharedHome.trim() !== '') return sharedHome
   const configured = process.env.CODEX_HOME
   return typeof configured === 'string' && configured.trim() !== '' ? configured : join(homedir(), '.codex')
 }

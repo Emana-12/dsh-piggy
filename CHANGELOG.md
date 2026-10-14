@@ -7,9 +7,13 @@ All notable changes to `dsh-pig`. Versions follow the plugin's own
 
 ## [Unreleased]
 
-## Codex 本地插件
+### Codex / Agent 联动
 
-新增 Codex 本地插件 marketplace 与安装脚本，以及桌面版 IPC 桥。MCP 通过桌面主进程读写唯一存档，开放养成、工作事件和扩展操作；桌面端需要外壳 0.6.5。Codex CLI marketplace 重复安装及 MCP 工具发现已通过；Electron 真实窗口已启动。真实 Codex agent 工具调用和桌面窗口双向同步仍待联调验收，当前未发布。
+- 新增 Codex 本地插件 marketplace、安装脚本和桌面版 IPC 桥；MCP 与本机桌面版共用唯一存档，开放养成操作、扩展查询和 Agent 工作状态提醒。
+- 增加 `UserPromptSubmit`、`PreToolUse`、`PermissionRequest`、`PostToolUse`、`Stop`、`Interrupt` 六类 Hook，统一映射为开始、工作中、等待确认、工具完成、完成、出错和中断状态；适配器只发送事件类别、结果和去重标识。
+- 增加通用 Agent 生命周期协议、适配器模板和 `DSH_PIGGY_HOME` 配对路径；桌面桥不可用时 Hook 快速返回，不阻断 Agent 原任务。
+- 修复桌面猪窗口与面板窗口并发消费待显示台词的问题。状态快照会在两个窗口间合并广播，页面尚未加载时不会提前消费队列，`UserPromptSubmit` 气泡可以稳定显示。
+- 插件版本升至 `0.1.1`，桌面外壳使用 `0.6.5`；新增桌面桥回归测试，并通过 Windows 安装包、真实存档和 Hook 写入验证。
 
 ## [0.36.1] — 2026-10-12 · 扩展整包下载（外壳 0.6.4 不变）
 

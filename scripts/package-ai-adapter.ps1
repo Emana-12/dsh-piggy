@@ -30,7 +30,7 @@ try {
     '',
     '1. Give the dsh-piggy directory and docs/AI-CLI-接入指南.md to the target CLI AI.',
     '2. Ask the AI to inspect the CLI Hook/MCP mechanism, generate an adapter, and run acceptance checks.',
-    '3. The desktop app and CLI must use the same pairing file. Never copy or edit state.json directly.',
+    '3. The desktop app and target Agent must use the same pairing directory. Set DSH_PIGGY_HOME for the Agent when its home directory differs. Never copy or edit state.json directly.',
     '4. Require a report with status, generated files, enabled hooks, and acceptance results.'
   ) -join [Environment]::NewLine
   Set-Content -LiteralPath (Join-Path $destination 'AI-CLI-INSTALL.txt') -Value $instructions -Encoding UTF8

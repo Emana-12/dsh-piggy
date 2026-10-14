@@ -11,7 +11,8 @@ import { createServer } from 'node:net'
 
 const PROTOCOL_VERSION = 1
 const MAX_MESSAGE_BYTES = 1024 * 1024
-const CODEX_EVENTS = new Set(['turn', 'tool'])
+// Agent Hook 的统一生命周期事件；旧版 Codex 事件保留兼容，便于平滑更新适配器。
+const AGENT_EVENTS = new Set(['start', 'working', 'waiting', 'done', 'error', 'interrupt', 'turn', 'tool', 'toolError', 'prompt'])
 const ACTIONS = new Set(['hatch', 'adopt', 'reset', 'feed', 'bathe', 'play', 'pet', 'reply', 'signIn', 'pomodoro', 'pomodoroAbandon', 'openGift', 'removeExtension', 'installExtension', 'ext', 'setExtension', 'chat', 'quiet', 'owner', 'catchphrase', 'motto', 'crown', 'name', 'work', 'study', 'interest', 'trip', 'fishCast', 'fishHook', 'fishResolve', 'fishKeep', 'fishFeed', 'fishSell', 'fishRod', 'fishAutomation', 'fishCollect', 'fishSpot', 'exchange', 'fishAuto', 'fishGive', 'fishSkip', 'skin', 'calloff', 'buy', 'use', 'doctor', 'sell', 'wear'])
 const ACTION_FIELDS = Object.freeze({
   hatch: [], adopt: ['confirm'], reset: ['confirm'], feed: ['item'], bathe: ['item'], play: ['item'], pet: ['part'], reply: ['line', 'index'],
@@ -53,8 +54,11 @@ function isClosedPipeError(error) {
 export function startCodexBridge(options) {
   const endpoint = options.endpoint ?? codexBridgeEndpoint()
   const pairingToken = randomBytes(32).toString('hex')
+  const configuredSharedHome = process.env.DSH_PIGGY_HOME
   const configuredCodexHome = process.env.CODEX_HOME
-  const codexHome = typeof configuredCodexHome === 'string' && configuredCodexHome.trim() !== '' ? configuredCodexHome : join(homedir(), '.codex')
+  const codexHome = typeof configuredSharedHome === 'string' && configuredSharedHome.trim() !== ''
+    ? configuredSharedHome
+    : typeof configuredCodexHome === 'string' && configuredCodexHome.trim() !== '' ? configuredCodexHome : join(homedir(), '.codex')
   const pairingFile = options.pairingFile ?? join(codexHome, 'dsh-piggy-pairing.json')
   const seenEvents = new Map()
   const actionResults = new Map()
@@ -99,7 +103,7 @@ const FISH_AUTO_MINUTES = new Set([30, 60, 120, 240])
       if (request.method === 'pair') return send(socket, request.id, true, { pigId: options.getStore()?.state?.pigId ?? null })
       if (!['status', 'extensions', 'action', 'event'].includes(request.method)) throw new Error('不支持的桌面桥方法')
       if (request.method === 'action' && (typeof request.operation !== 'string' || !ACTIONS.has(request.operation))) throw new Error('养成操作不在允许列表中')
-      if (request.method === 'event' && (typeof request.event !== 'string' || !CODEX_EVENTS.has(request.event))) throw new Error('Codex 工作事件无效')
+      if (request.method === 'event' && (typeof request.event !== 'string' || !AGENT_EVENTS.has(request.event))) throw new Error('Agent 工作事件无效')
       const status = await options.getStatus()
       const currentPigId = typeof status.pigId === 'string' ? status.pigId : null
       const isEmptySaveRead = currentPigId === null && request.pigId === null && request.method === 'status'
@@ -164,11 +168,12 @@ const FISH_AUTO_MINUTES = new Set([30, 60, 120, 240])
   }
 
   function recordEvent(request) {
-    if (typeof request.event !== 'string' || !CODEX_EVENTS.has(request.event) || typeof request.eventId !== 'string' || request.eventId.length > 256) throw new Error('Codex 工作事件无效')
+    if (typeof request.event !== 'string' || !AGENT_EVENTS.has(request.event) || typeof request.eventId !== 'string' || request.eventId.length > 256) throw new Error('Agent 工作事件无效')
     if (seenEvents.has(request.eventId)) return { ok: true, accepted: false, duplicate: true }
     const store = options.getStore()
-    if (typeof store?.recordCodexEvent !== 'function') throw new Error('当前桌面游戏包不支持 Codex 工作事件，请更新游戏包')
-    const result = store.recordCodexEvent(request.event, request.eventId, request.success !== false)
+    const record = typeof store?.recordAgentEvent === 'function' ? store.recordAgentEvent : store?.recordCodexEvent
+    if (typeof record !== 'function') throw new Error('当前桌面游戏包不支持 Agent 工作事件，请更新游戏包')
+    const result = record.call(store, request.event, request.eventId, request.success !== false)
     if (result.ok) remember(seenEvents, request.eventId, true, 8192)
     return result
   }
@@ -236,6 +241,9 @@ const FISH_AUTO_MINUTES = new Set([30, 60, 120, 240])
     },
   }
 }
+
+// 新适配器使用宿主无关的名称；保留旧导出名供现有桌面入口调用。
+export const startAgentBridge = startCodexBridge
 
 function isRecord(value) { return typeof value === 'object' && value !== null && !Array.isArray(value) }
 

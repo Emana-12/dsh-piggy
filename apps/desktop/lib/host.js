@@ -18,6 +18,7 @@ export async function startHost(gameDir, statePath, options = {}) {
   const load = name => import(pathToFileURL(join(gameDir, name)).href)
   const { createStore } = await load('store.js')
   const { registerRoutes } = await load('routes.js')
+  const { snapshot } = await load('snapshot.js')
   const { environmentNote } = await load('environment.js')
   const store = createStore(statePath)
   // 桌面版的日志表头和外壳版本一起记，导出时一眼看出是哪一版外壳。
@@ -76,5 +77,9 @@ export async function startHost(gameDir, statePath, options = {}) {
     return result
   }
 
-  return { store, handle, handleAction, dispose: () => store.dispose() }
+  // 桥接事件没有一个渲染窗口可以直接消费响应；先在主进程取一次快照，
+  // 再把同一份 pending 广播给两个窗口，避免面板窗口先取走猪窗口的台词。
+  function getSnapshot() { return snapshot(store) }
+
+  return { store, handle, handleAction, getSnapshot, dispose: () => store.dispose() }
 }

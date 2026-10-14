@@ -11,7 +11,7 @@ Codex 插件通过认证的本机桥访问正在运行的桌面版 dsh-piggy。E
    ```
 
    脚本会添加本地 marketplace 并安装插件。macOS/Linux 可用 PowerShell 7 执行 `pwsh ./scripts/install-codex-plugin.ps1`，或按下方 CLI 命令手动安装。脚本会把插件启用在此仓库；重新运行可刷新本地安装。
-2. 桌面外壳联动桥随本 Fork 的 `0.6.5` 源码提供。PowerShell 命令如下（桌面外壳和 Codex CLI 应使用同一个 `CODEX_HOME`，或都不设置）：
+2. 桌面外壳联动桥随本 Fork 的 `0.6.5` 源码提供。PowerShell 命令如下（桌面外壳和 Codex CLI 应使用同一个 `DSH_PIGGY_HOME`；不设置时才回退到 `CODEX_HOME`）：
 
    ```powershell
    cd apps/desktop
@@ -21,8 +21,8 @@ Codex 插件通过认证的本机桥访问正在运行的桌面版 dsh-piggy。E
 
    保持桌面版运行；原版 `0.6.4` 外壳不包含联动桥，需使用本 Fork 构建的桌面版。Electron GUI 已在本机启动并完成窗口 ready/show/load 冒烟检查；桌面画面实时刷新和面板操作反向同步仍待验收。
 3. 安装/更新后在 Codex 新建会话。明确调用 `piggy_pair` 绑定桌面猪，再调用 `piggy_status` 查看；纸盒状态下说“打开盒子”即可在 Codex 内开盒。普通状态查询和 Hook 均不会自动更换绑定。重置/重新领养会生成新的 pigId，用户明确要求后再调用 `piggy_pair`。
-4. Codex Hooks 需在 `/hooks` 审查并信任。未配对或桌面端离线时静默跳过，不影响原任务；若此版本没有钩子信任界面，可单独停用插件 Hooks，养成工具仍可用。
-5. Codex 插件与桌面端必须使用同一个 `CODEX_HOME`；未设置时使用 `%USERPROFILE%\.codex`。桌面端退出会移除短期凭据；重启后 MCP 使用新凭据，猪身份绑定保持不变。
+4. Codex Hooks 需在 `/hooks` 审查并信任。信任后，小猪会在用户提交任务、开始工作、完成、出错或中断时按自己的说话风格显示气泡；普通工具成功只记成长，工作中提示有短冷却，不会连续刷屏。未配对或桌面端离线时静默跳过，不影响原任务；若此版本没有钩子信任界面，可单独停用插件 Hooks，养成工具仍可用。
+5. Codex 插件与桌面端必须使用同一个 `DSH_PIGGY_HOME`；未设置时使用 `CODEX_HOME`，再回退到 `%USERPROFILE%\.codex`。桌面端退出会移除短期凭据；重启后 MCP 使用新凭据，猪身份绑定保持不变。
 
 手动 CLI 安装：`codex plugin marketplace add <完整源码仓库路径>`，然后 `codex plugin add dsh-piggy --marketplace dsh-piggy-local`。插件工具可在 CLI 与 Codex 桌面版中安装；工作事件 Hooks 目前仅由手动安装的 Codex 桌面插件支持，并须审核信任。Marketplace 使用相对于仓库根目录的插件路径，因此不能单独拷贝插件目录；使用者必须拿到同一份完整仓库源码和含桌面桥的 `0.6.5`。
 

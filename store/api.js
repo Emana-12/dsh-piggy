@@ -67,6 +67,7 @@ import {
   selectSkin as coreSelectSkin,
   registerCustomSkin as coreRegisterCustomSkin,
   sayAfter as coreSayAfter,
+  say as coreSay,
 } from '../core.js'
 import { randomUUID } from 'node:crypto'
 
@@ -92,6 +93,8 @@ export function createApi(control) {
 
   /** 上一次「面板轮询」的时刻，用来算在线时长；0 = 还没见过第一次。 */
   let lastPollMs = 0
+  /** 工作中提示需要限频，避免 PreToolUse 连续刷满气泡队列。 */
+  let lastAgentNoticeAt = 0
 
   return {
     /** The live state (null until an egg is laid). Exposed for rendering. */
@@ -120,17 +123,48 @@ export function createApi(control) {
       }
     },
 
-    /** 从 Codex 本机桥收到一个工作事件，并把去重 ID 留在同一份存档中。 */
-    recordCodexEvent(event, eventId, success = true) {
-      if (!['turn', 'tool', 'toolError'].includes(event) || typeof eventId !== 'string' || eventId.length > 256) return { ok: false, reason: 'invalid-event' }
-      if (event === 'tool' && success !== true && success !== false) return { ok: false, reason: 'invalid-event' }
+    /** 从任意 Agent Hook 收到统一工作事件，并把去重 ID 留在同一份存档中。 */
+    recordAgentEvent(event, eventId, success = true) {
+      const events = ['start', 'working', 'waiting', 'done', 'error', 'interrupt', 'turn', 'tool', 'toolError', 'prompt']
+      if (!events.includes(event) || typeof eventId !== 'string' || eventId.length > 256) return { ok: false, reason: 'invalid-event' }
+      if (success !== true && success !== false) return { ok: false, reason: 'invalid-event' }
       return mutate(state => {
-        const oldIds = Array.isArray(state.codexEventIds) ? state.codexEventIds.filter(value => typeof value === 'string').slice(-4095) : []
+        const oldIds = [
+          ...(Array.isArray(state.agentEventIds) ? state.agentEventIds : []),
+          ...(Array.isArray(state.codexEventIds) ? state.codexEventIds : []),
+        ].filter(value => typeof value === 'string').slice(-4095)
         if (oldIds.includes(eventId)) return { ok: true, duplicate: true }
-        coreFeed(state, event === 'tool' && success === false ? 'toolError' : event, now())
-        state.codexEventIds = [...oldIds, eventId].slice(-4096)
+        const nowMs = now()
+        const feedEvent = event === 'start' || event === 'prompt' ? 'turn'
+          : event === 'error' ? 'toolError'
+            : event === 'interrupt' ? 'agentError'
+              : event === 'turn' ? 'turn'
+                : event === 'toolError' ? 'toolError'
+                  : event === 'tool' ? (success ? 'tool' : 'toolError')
+                    : null
+        if (feedEvent !== null) coreFeed(state, feedEvent, nowMs)
+        const scene = event === 'start' || event === 'prompt' ? 'agentStart'
+          : event === 'working' ? 'agentWorking'
+            : event === 'waiting' ? 'agentWaiting'
+              : event === 'done' ? 'agentDone'
+                : event === 'error' ? 'agentError'
+                  : event === 'interrupt' ? 'agentInterrupt'
+                  : null
+        const canSpeak = state.hatched === true && state.dead !== true && state.dialogue?.quiet !== true
+        const workingQuiet = event === 'working' && nowMs - lastAgentNoticeAt < 45_000
+        if (canSpeak && scene !== null && !workingQuiet) {
+          coreSay(state, scene, nowMs)
+          lastAgentNoticeAt = nowMs
+        }
+        state.agentEventIds = [...oldIds, eventId].slice(-4096)
         return { ok: true }
       })
+    },
+
+    /** 旧版 Codex 插件接口别名；新适配器统一调用 recordAgentEvent。 */
+    recordCodexEvent(event, eventId, success = true) {
+      const recordAgentEvent = this.recordAgentEvent
+      return recordAgentEvent.call(this, event, eventId, success)
     },
 
     /** Fold wall-clock decay in (and resolve work/illness) then hand back state. */

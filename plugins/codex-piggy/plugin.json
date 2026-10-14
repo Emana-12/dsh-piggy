@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "dsh-piggy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "在 Codex 中照顾与桌面版共享存档的小猪。",
   "author": {
     "name": "dsh-piggy contributors"

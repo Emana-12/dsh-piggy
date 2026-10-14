@@ -65,6 +65,12 @@ export const MORE_LINES = Object.freeze({
 
   // ---- 新场景 ----------------------------------------------------------------
   workStart: scene(line('出门搬砖去了'), line('我去给家里挣饲料钱'), line('老板，我来了！')),
+  agentStart: scene(line('开工啦，[主人]，我帮你盯着'), line('你忙你的，我在旁边加油'), line('今天也一起把事情做完')),
+  agentWorking: scene(line('你继续写，我在旁边加油'), line('我看不懂，但我会认真陪着'), line('别急，慢慢来，我守着呢')),
+  agentWaiting: scene(line('我等你确认一下，再继续'), line('这里需要你点个头，我先看着'), line('不急，等你回来我们再出发')),
+  agentDone: scene(line('完成啦！这次干得漂亮'), line('收工！今天也辛苦你了'), line('事情做完了，可以摸我一下')),
+  agentError: scene(line('好像卡住了，别急，我们看看'), line('出了点小问题，我陪你排查'), line('先喘口气，再把它修好')),
+  agentInterrupt: scene(line('先停一下也好，喘口气再继续'), line('收到，暂停一下不会输'), line('我在这儿，准备好再出发')),
   studyStart: scene(line('上学去！书包里装的是零食'), line('今天也要听懂一句'), line('老师别点我名')),
   tripStart: scene(line('出发啦！'), line('我会给你带特产的（不是腊肉）'), line('路上别想我')),
   buy: scene(line('买到了！'), line('这个钱花得值'), line('谢谢老板（我说的是你）')),

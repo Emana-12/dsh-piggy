@@ -678,10 +678,23 @@ let panelAsked = null
 let panelReady = false
 
 let stateTimer = null
+let pendingStateView
 /** 存档变了：两个窗口都刷新（合并 30ms 内的多次，一次动作可能连发几个请求）。 */
-function announceStateChanged() {
+function announceStateChanged(view) {
+  if (view !== undefined) {
+    const previousPending = Array.isArray(pendingStateView?.pending) ? pendingStateView.pending : []
+    const nextPending = Array.isArray(view.pending) ? view.pending : []
+    pendingStateView = previousPending.length === 0
+      ? view
+      : { ...view, pending: [...previousPending, ...nextPending] }
+  }
   if (stateTimer !== null) return
-  stateTimer = setTimeout(() => { stateTimer = null; toPages('piggy:state-changed') }, 30)
+  stateTimer = setTimeout(() => {
+    const next = pendingStateView
+    pendingStateView = undefined
+    stateTimer = null
+    toPages('piggy:state-changed', next)
+  }, 30)
 }
 
 /** 猪在屏幕上的框（拖到屏幕边时加上猪在窗口里滑出去的那一截）。 */
@@ -1078,7 +1091,9 @@ app.whenReady().then(async () => {
       return { ...result, pigId: host?.store?.state?.pigId ?? null }
     },
     onStateChange: () => {
-      announceStateChanged()
+      // 页面尚未加载时不能先 drain pending，否则首次刷新会错过这句台词。
+      const petReady = win !== null && !win.isDestroyed() && !win.webContents.isLoading()
+      announceStateChanged(petReady ? host.getSnapshot() : undefined)
     },
     onRequest: method => hostJournal?.record?.('info', 'codex-bridge', '本机桥请求', { method }),
   })
