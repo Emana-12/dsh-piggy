@@ -754,7 +754,12 @@ function ensurePanelWindow() {
   panelWin.webContents.on('did-finish-load', () => {
     panelReady = true
     log('panel page loaded')
-    if (panelOpen && panelAnchor !== null) sendPanel({ type: 'open', vertical: panelAnchor.vertical, maxHeight: panelAnchor.maxHeight })
+    if (panelOpen && panelAnchor !== null) {
+      // 面板可能在用户打开后才加载完；猪页也要同步拆窗状态，避免面板出现后
+      // 猪的气泡仍画在面板窗口下面。
+      sendPetPanelState('open')
+      sendPanel({ type: 'open', vertical: panelAnchor.vertical, maxHeight: panelAnchor.maxHeight })
+    }
   })
   panelWin.webContents.on('console-message', (e, level, message) => { if (level >= 2) log('panel:', message) })
   panelWin.webContents.on('render-process-gone', (e, d) => { log('panel renderer gone', JSON.stringify(d)); panelWin = null; closePanel('crash') })
@@ -810,8 +815,16 @@ function openPanel(pig) {
   panelAnchor = null
   panelAnchor = decidePanelAnchor()
   if (panelAnchor === null) return
+  // 面板页面还没上报尺寸前，先通知猪页面板已打开；避免面板稍后出现时，
+  // 猪页仍以为自己没有邻窗。
+  sendPetPanelState('open')
   sendPanel({ type: 'open', vertical: panelAnchor.vertical, maxHeight: panelAnchor.maxHeight })
   placePanel()
+}
+
+/** 面板页面加载期间也保持猪页的拆窗状态同步。 */
+function sendPetPanelState(type) {
+  if (win !== null && !win.isDestroyed()) win.webContents.send('piggy:panel', { type })
 }
 
 function closePanel(why) {
@@ -819,7 +832,7 @@ function closePanel(why) {
   panelOpen = false
   if (panelWin !== null && !panelWin.isDestroyed()) panelWin.hide()
   sendPanel({ type: 'closed' })
-  if (win !== null && !win.isDestroyed()) win.webContents.send('piggy:panel', { type: 'closed' })
+  sendPetPanelState('closed')
   log('panel closed', why)
 }
 

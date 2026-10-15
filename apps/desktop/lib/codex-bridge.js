@@ -32,6 +32,9 @@ const REQUIRED_FIELDS = Object.freeze({
   sell: ['souvenir'], wear: ['item'],
 })
 const DANGEROUS_ACTIONS = new Set(['reset', 'adopt', 'removeExtension', 'installExtension', 'skin'])
+const POMODORO_MINUTES = new Set([15, 25, 45])
+const EXCHANGE_DIRECTIONS = new Set(['toGold', 'fromGold'])
+const FISH_AUTO_MINUTES = new Set([30, 60, 120, 240])
 
 /** 由桌面端和 Codex 插件共同计算当前用户的 IPC 地址。 */
 export function codexBridgeEndpoint(platform = process.platform, uid = process.getuid?.(), username = userInfo().username) {
@@ -87,10 +90,6 @@ export function startCodexBridge(options) {
     socket.on('close', () => clients.delete(socket))
     socket.on('error', () => clients.delete(socket))
   })
-const POMODORO_MINUTES = new Set([15, 25, 45])
-const EXCHANGE_DIRECTIONS = new Set(['toGold', 'fromGold'])
-const FISH_AUTO_MINUTES = new Set([30, 60, 120, 240])
-
   async function respond(socket, line) {
     let request
     try {

@@ -3,16 +3,29 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { getBinding, readPairing, requestDesktop } from '../lib/bridge-client.js'
 
-let raw = ''
-for await (const chunk of process.stdin) {
-  raw += chunk
-  if (Buffer.byteLength(raw) > 64 * 1024) {
-    process.exit(0)
+/**
+ * Codex 会把一份 JSON 写入 stdin；异步 Hook 的管道不保证立刻发送 EOF。
+ * 读到一份完整 JSON 后马上返回，避免一直等 EOF 导致命令超时而没有发出事件。
+ */
+async function readInput() {
+  let raw = ''
+  for await (const chunk of process.stdin) {
+    raw += chunk
+    if (Buffer.byteLength(raw) > 64 * 1024) return null
+    const text = raw.trim()
+    if (text === '') continue
+    try { return JSON.parse(text) } catch {
+      // JSON 可能被拆成多个数据块，继续读取；收到 EOF 时再判定为无效输入。
+    }
   }
+  const text = raw.trim()
+  if (text === '') return null
+  try { return JSON.parse(text) } catch { return null }
 }
 
 try {
-  const input = JSON.parse(raw)
+  const input = await readInput()
+  if (input === null || typeof input !== 'object') process.exit(0)
   const eventName = input.hook_event_name
   const event = eventName === 'UserPromptSubmit' ? 'start'
     : eventName === 'PreToolUse' ? 'working'
@@ -34,7 +47,9 @@ try {
   if (pigId === null) process.exit(0)
   readPairing()
   const success = eventName !== 'Interrupt' && eventName !== 'PermissionRequest' && input.tool_response?.isError !== true
-  await requestDesktop('event', { pigId, event, eventId, success }, 700)
+  // 异步 Hook 会与界面共用桌面桥；给繁忙的 Windows Electron 留出写入时间，
+  // 同时保持在 hooks.json 的两秒命令上限内。
+  await requestDesktop('event', { pigId, event, eventId, success }, 1500)
 } catch {
   // 桌面桥断开或数据无效都不能阻断 Agent 的原任务。
 }
